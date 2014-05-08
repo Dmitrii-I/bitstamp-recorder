@@ -15,6 +15,10 @@
 from ws4py.client.threadedclient import WebSocketClient # trim the fat, import only one class
 import datetime
 import subprocess
+import sys
+
+sys.stdout = open("python_stdout.log", "a")
+sys.stderr = open("python_stderr.log", "a")
 
 class BitstampRecorder(WebSocketClient):
         """ This class inherits from WebSocketClient class. We extend the __init__ method a bit. """
