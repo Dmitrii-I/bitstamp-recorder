@@ -3,5 +3,5 @@
 
 cd ~/bitstamp-recorder
 python bitstamp-recorder.py &
-echo 'bitstamp-recorder.py is started' | ssmtp root &
+echo 'bitstamp-recorder.py is started' | ssmtp root & 2> /dev/null
 
