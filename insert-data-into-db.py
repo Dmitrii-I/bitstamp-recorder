@@ -69,7 +69,7 @@ def insert_into_book(line):
 
 if __name__ == '__main__':
         
-        db_conn = psycopg2.connect(database="test", user="dima", password="krJJ8Nfx", host="127.0.0.1", port="5432")
+        db_conn = psycopg2.connect(database="test", user="dima", password="fdffJ8Nfx", host="127.0.0.1", port="5432")
         db = db_conn.cursor() 
 
         for file in files_to_process():
