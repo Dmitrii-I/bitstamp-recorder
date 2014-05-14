@@ -40,14 +40,14 @@ class BitstampRecorder(WebSocketClient):
                 self.send('{"data": {"channel": "order_book"}, "event": "pusher:subscribe"}')
                  
         def closed(self, code, reason=None):
-        	self.ws_data.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f UTC, ") + "Someone closed the process.\n")
+        	self.logfile.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f UTC, ") + "Someone closed the process with code: " + code + " and reason: " + reason + "\n")
+                self.logfile.close()
 
 		# The following lines are optional. Start a new Bitstamp recorder instance. We do not want to miss any data.
 		# Send an email to root user of the Linux server we are running on (alias set in /etc/ssmtp/ssmtp.conf) to
 		# inform that something's ain't right here.
 		subprocess.call("echo 'Bitstamp websocket closed, bitstamp-recorder.py stopped nondeliberately. Will started it right away.' | ssmtp root &", shell=True)
 		subprocess.call("./start-bitstamp-recorder.sh", shell=True)
-                recorder.logfile.close()
 
         def received_message(self, m):
                 self.logfile.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f UTC, ") + str(m) + "\n")                
