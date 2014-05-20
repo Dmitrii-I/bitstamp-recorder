@@ -32,7 +32,8 @@ def process_line(line):
                         insert_into_trades(line)
                 elif json_line["event"] == 'data':
                         insert_into_book(line)
-        except ValueError:
+        #except ValueError:
+        except:
                 pass
                  
         
