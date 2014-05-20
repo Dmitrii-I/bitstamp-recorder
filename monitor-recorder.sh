@@ -6,13 +6,13 @@
 # Learned this trick here: http://stackoverflow.com/questions/3430330/best-way-to-make-a-shell-script-daemon
 
 (
-while ~/bitstamp-recorder/is-bitstamp-recorder-running.sh; do
+while ~/bitstamp-recorder/is-recorder-running.sh; do
 	timestamp=$(date +"%Y-%m-%d %H:%M:%S.%N")
-	echo -n "$timestamp " >> ~/bitstamp-recorder/bitstamp-recorder.log
-	echo "bitstamp-recorder.py is still running" >> ~/bitstamp-recorder/bitstamp-recorder.log
+	echo -n "$timestamp " >> ~/bitstamp-recorder/recorder.log
+	echo "Bitstamp websocket recorder is still running" >> ~/bitstamp-recorder/recorder.log
 	sleep 60
 done
 
 # if bitstamp-recorder.py is not running, send mail to root user (alias set in /etc/ssmtp/ssmtp.conf) and quit
-echo "Message from monitor-bistamp-recorder.sh: bistamp-recorder.py not running anymore for some reason. Please check and start manually." | ssmtp root &
+echo "Message from monitor-recorder.sh: Recorder is not running anymore for some reason. Please check and start manually." | ssmtp root &
 ) &

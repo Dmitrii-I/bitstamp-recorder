@@ -17,8 +17,8 @@ import datetime
 import subprocess
 import sys
 
-sys.stdout = open("bitstamp-recorder-stdout.log", "a")
-sys.stderr = open("bitstamp-recorder-stderr.log", "a")
+sys.stdout = open("recorder.log", "a")
+sys.stderr = open("recorder.log", "a")
 
 class BitstampRecorder(WebSocketClient):
         """ This class inherits from WebSocketClient class. We extend the __init__ method a bit. """
