@@ -5,5 +5,7 @@
 # from the terminal, then the python process will get the parent PID of your terminal.
 # When you exit the terminal, the python process will be stopped. This is not the behavior we want.
 
-python bitstamp-websocket-recorder.py &
-echo 'Bitstamp recorder has been started' | ssmtp root & 2> /dev/null
+./bitstamp-websocket-recorder.py &
+timestamp=$(date +"%Y-%m-%d %H:%M:%S.%N")
+echo -ne "$timestamp\t" >> recorder.log
+echo -ne "start-recorder.sh\tBitstamp recorder has been started\n" >> recorder.log

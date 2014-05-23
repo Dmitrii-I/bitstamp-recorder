@@ -20,12 +20,12 @@ import sys
 sys.stdout = open("recorder.log", "a")
 sys.stderr = open("recorder.log", "a")
 
-class BitstampRecorder(WebSocketClient):
+class BitstampWebsocketRecorder(WebSocketClient):
         """ This class inherits from WebSocketClient class. We extend the __init__ method a bit. """
         
         def __init__(self, url):
 		# url is the websocket url, excluding the channel string
-                super(BitstampRecorder, self).__init__(url)
+                super(BitstampWebsocketRecorder, self).__init__(url)
                 self.logfile = open(self.new_log_filename(), "a")
                 self.logfile_lines_counter = 0
                 # one line is about 1 KB. If log reaches max_lines start to writing new logfile:
@@ -40,18 +40,16 @@ class BitstampRecorder(WebSocketClient):
                 self.send('{"data": {"channel": "order_book"}, "event": "pusher:subscribe"}')
                  
         def closed(self, code, reason=None):
-        	try:
-			self.logfile.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f UTC, ") + "Someone closed the process with code: " + code + " and reason: " + reason + "\n")
-                	self.logfile.close()
-
-		# The following lines are optional. Start a new Bitstamp recorder instance. We do not want to miss any data.
-		# Send an email to root user of the Linux server we are running on (alias set in /etc/ssmtp/ssmtp.conf) to
-		# inform that something's ain't right here.
-			subprocess.call("echo 'Bitstamp websocket closed, bitstamp-recorder.py stopped nondeliberately. Will started it right away.' | ssmtp root &", shell=True)
-			subprocess.call("./start-bitstamp-recorder.sh", shell=True)
-		except:
-			pass # because we want to start new recorder instance no matter what. Pass on all exceptions
-	
+                # This method is called if the websocket connection is closed (by server or connection error)
+		# Start a new Bitstamp recorder instance. We do not want to miss any data.
+		# Send an email to root user of the Linux server we are running on (alias set in /etc/ssmtp/ssmtp.conf) 
+		subprocess.call("echo 'Bitstamp recorder stopped nondeliberately. Will attempt to start it right away.' | ssmtp root &", shell=True)
+		subprocess.call("./start-recorder.sh", shell=True)
+                exit_message = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f UTC, ") + "Recorder stopped. Code: " + \
+                        str(code) + ". Reason: " + str(reason) + "\n"
+		self.logfile.write(exit_message)
+		print(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f UTC, "), "Recorder stopped. Code: ", code, ". Reason: ", reason, "\n")
+                self.logfile.close()
 
         def received_message(self, m):
                 self.logfile.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f UTC, ") + str(m) + "\n")                
@@ -62,12 +60,7 @@ class BitstampRecorder(WebSocketClient):
                         self.logfile_lines_counter = 0
 
 if __name__ == '__main__':
-        try:
-                # Bitstamp uses hosted websocket service from pusher.com. Bitstamp's app key is de504dc5763aeef9ff52
-                recorder = BitstampRecorder('ws://ws.pusherapp.com:80/app/de504dc5763aeef9ff52?client=justme&version=0.2.0&protocol=6')
-                recorder.connect()
-                recorder.run_forever()
-
-        except KeyboardInterrupt:
-                recorder.close()
-
+        # Bitstamp uses hosted websocket service from pusher.com. Bitstamp's app key is de504dc5763aeef9ff52
+        recorder = BitstampWebsocketRecorder('ws://ws.pusherapp.com:80/app/de504dc5763aeef9ff52?client=justme&version=0.2.0&protocol=6')
+        recorder.connect()
+        recorder.run_forever()

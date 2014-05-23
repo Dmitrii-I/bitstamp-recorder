@@ -8,16 +8,22 @@
 # write to same file because in some cases both instances will write to same line
 # in the text file and you end up with mumbo-jumbo.
 
+(
 # get the PID of current instance
-pid_old_instance=$(ps -ef | grep "python bitstamp-websocket-recorder.py" | grep -v grep | tr -s " " | cut -d " " -f2)
-echo "PID old instance is $pid_old_instance"
+pid_old_instance=$(ps -ef | grep "bitstamp-websocket-recorder.py" | grep -v grep | tr -s " " | cut -d " " -f2)
 
-# Start new instance
-~/bitstamp-recorder/start-recorder.sh
+./start-recorder.sh
+timestamp=$(date +"%Y-%m-%d %H:%M:%S.%N")
+echo -ne "$timestamp\t" >> recorder.log
+echo -ne "restart-recorder.sh\tNew recorder instance has been started\n" >> recorder.log
 
-echo "Will now wait one minute before stopping old instance with PID $pid_old_instance in order not to miss data if new instance is not recording immediately."
+timestamp=$(date +"%Y-%m-%d %H:%M:%S.%N")
+echo -ne "$timestamp\t" >> recorder.log
+echo -ne "restart-recorder.sh\tWaiting 1 minute before stopping old instance to not miss data if new instance is not recording immediately\n" >> recorder.log
 sleep 60
-echo "Done waiting. Will now stop old instance with PID $pid_old_instance"
+
 kill $pid_old_instance
-echo "Done stopping old instance. Completed all steps. This script will quit now"
-echo 'Bitstamp recorder stopped deliberately through stop-recorder.sh as a planned restart. New instance of recorder is already running.' | ssmtp root &
+timestamp=$(date +"%Y-%m-%d %H:%M:%S.%N")
+echo -ne "$timestamp\t" >> recorder.log
+echo -ne "restart-recorder.sh\tDone waiting. Will now stop old instance (SIGTERM) with PID $pid_old_instance\n" >> recorder.log
+) & # let the script run in the background. We do not want to wait one minute in the terminal
