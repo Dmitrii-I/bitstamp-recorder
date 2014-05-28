@@ -1,4 +1,7 @@
-bitstamp-recorder
+websocket\_recorder
 =================
 
-Python scripts to record order book and trades data on Bitstamp bitcoin exchange 
+Python script to record incoming WebSocket messages into text files. Can be used with any WebSocket url, though
+I am using it to record streaming data from bitcoin exchanges.
+
+ 

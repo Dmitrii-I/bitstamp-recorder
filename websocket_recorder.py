@@ -34,11 +34,10 @@ class WebsocketRecorder(WebSocketClient):
                  
         def closed(self, code, reason=None):
                 # This method is called if the websocket connection is closed (by server or connection error)
-		# Start a new Bitstamp recorder instance. We do not want to miss any data.
-		# Send an email to root user of the Linux server we are running on (alias set in /etc/ssmtp/ssmtp.conf) 
                 exit_message = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f UTC, ") + "Recorder stopped. Code: " + \
                         str(code) + ". Reason: " + str(reason) + "\n"
-		self.logfile.write(exit_message)
+		print(exit_message)
+                self.logfile.write(exit_message)
                 self.logfile.close()
 
         def received_message(self, ws_msg):
