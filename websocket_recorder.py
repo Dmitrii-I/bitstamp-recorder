@@ -13,19 +13,23 @@ import hashlib
 
 class WebsocketRecorder(WebSocketClient):
         """ This class inherits from WebSocketClient class. We extend the __init__ method a bit. """
-        def __init__(self, url, msg_to_send, max_lines, script_filename, machine_id):
+        def __init__(self, url, msg_to_send, max_lines, script_filename, machine_id, ws_name):
                 self.url = url
                 self.msg_to_send = msg_to_send
 		self.max_lines = max_lines 
                 self.recorder_version = self.md5sum(script_filename)
                 self.machine_id = machine_id
+                self.ws_name = ws_name
                 self.recorder_session_id = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f UTC")
                 self.logfile = open(self.new_csv_file(), "a")
                 self.logfile_lines_counter = 0
                 super(WebsocketRecorder, self).__init__(self.url)
                 
         def new_csv_file(self):
-                return(datetime.datetime.now().strftime("%Y-%m-%d_%Hh%Mh%Ss_websocket_data.csv"))
+                timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%Hh%Mm%Ss")
+                websocket_name = self.ws_name
+                filename = timestamp + websocket_name + machine_id + ".csv"
+                return(filename)
 
         def opened(self):
                 # Send initial messages to the websocket
@@ -42,7 +46,7 @@ class WebsocketRecorder(WebSocketClient):
 
         def received_message(self, ws_msg):
                 message = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f UTC, ") + str(ws_msg) + ", " + self.recorder_version +\
-                                ", " + self.machine_id + ", " + self.recorder_session_id + "\n"
+                                ", " + self.machine_id + ", " + self.recorder_session_id + ", " + self.url + ", " + self.ws_name + "\n"
                 self.logfile.write(message)                
                 self.logfile_lines_counter += 1
                 # one line is about 1 KB. If log reaches max_lines write to new logfile:
@@ -65,6 +69,6 @@ if __name__ == '__main__':
         execfile(settings_file) # load the settings specific to a particular websocket
         sys.stdout = open(stdout_file, "a")
         sys.stderr = open(stderr_file, "a")
-        recorder = WebsocketRecorder(url, msg_to_send, max_lines, script_filename, machine_id)
+        recorder = WebsocketRecorder(url, msg_to_send, max_lines, script_filename, machine_id, ws_name)
         recorder.connect()
         recorder.run_forever()
