@@ -21,14 +21,13 @@ class WebsocketRecorder(WebSocketClient):
                 self.machine_id = machine_id
                 self.ws_name = ws_name
                 self.recorder_session_id = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f UTC")
-                self.logfile = open(self.new_csv_file(), "a")
-                self.logfile_lines_counter = 0
+                self.datafile = open(self.new_csv_file(), "a")
+                self.datafile_lines_counter = 0
                 super(WebsocketRecorder, self).__init__(self.url)
                 
         def new_csv_file(self):
                 timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%Hh%Mm%Ss")
-                websocket_name = self.ws_name
-                filename = timestamp + websocket_name + machine_id + ".csv"
+                filename = timestamp + self.ws_name + self.machine_id + ".csv"
                 return(filename)
 
         def opened(self):
@@ -41,19 +40,19 @@ class WebsocketRecorder(WebSocketClient):
                 exit_message = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f UTC, ") + "Recorder stopped. Code: " + \
                         str(code) + ". Reason: " + str(reason) + "\n"
 		print(exit_message)
-                self.logfile.write(exit_message)
-                self.logfile.close()
+                self.datafile.write(exit_message)
+                self.datafile.close()
 
         def received_message(self, ws_msg):
                 message = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f UTC, ") + str(ws_msg) + ", " + self.recorder_version +\
-                                ", " + self.machine_id + ", " + self.recorder_session_id + ", " + self.url + ", " + self.ws_name + "\n"
-                self.logfile.write(message)                
-                self.logfile_lines_counter += 1
-                # one line is about 1 KB. If log reaches max_lines write to new logfile:
-                if self.logfile_lines_counter >= self.max_lines:
-                        self.logfile.close() # close the full logfile
-                        self.logfile = open(self.new_csv_file(), 'a') # and open a new one
-                        self.logfile_lines_counter = 0
+                                ", " + self.machine_id + ", " + self.recorder_session_id + ", " + self.url + "\n"
+                self.datafile.write(message)                
+                self.datafile_lines_counter += 1
+                # one line is about 1 KB. If log reaches max_lines write to new datafile:
+                if self.datafile_lines_counter >= self.max_lines:
+                        self.datafile.close() # close the full datafile
+                        self.datafile = open(self.new_csv_file(), 'a') # and open a new one
+                        self.datafile_lines_counter = 0
 
         def md5sum(self, filename):
                 hasher = hashlib.md5()
