@@ -16,5 +16,5 @@ git clone https://github.com/Dmitrii-I/websocket_recorder.git
 ```
 python websocket-recorder.py settings/some-websocket-source.conf &
 ```
-The ampersand makes sure the script in background as a child of your terminal process. If you quit your terminal, the script stops to. To run it forever even if you quit, daemonize it, or use https://github.com/Dmitrii-I/bash-scripts/blob/master/keep-running.sh
+The ampersand at the end runs the script in the background as a child process of your terminal process. If you quit your terminal, the script will quit too. To run it forever, even if you quit the terminal use https://github.com/Dmitrii-I/bash-scripts/blob/master/keep-running.sh or daemonize it somehow.
 
