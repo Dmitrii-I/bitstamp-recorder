@@ -10,7 +10,7 @@ A Python script to record incoming WebSocket messages into text files. Each rece
 ## Installation on Linux
 ```
 cd ~
-git clone https://github.com/Dmitrii-I/websocket-recorder.git
+git clone https://github.com/Dmitrii-I/websocket_recorder.git
 ```
 ## Usage: 
 ```
