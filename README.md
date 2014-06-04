@@ -4,6 +4,9 @@
 
 A Python script to record incoming WebSocket messages into text files. Each received WebSocket message is logged on one line into a text file. On top of the original WebSocket message, some meta info is written too in the same line (e.g. timestamp, hostname). The script can be used with any WebSocket source. For each source create a config file similar to config examples provided in the directory settings.
 
+## Why do I need it?
+You need it to record the data to analyze later. For example you record news articles coming out of a news stream, where each news article is sent to you as one WebSocket message. Some bitcoin exchanges, like Bitstamp, provide streaming prices through WebSockets.
+
 ## Dependencies
 [ws4py](https://ws4py.readthedocs.org/en/latest/), version 0.3.3. at least. 
 
