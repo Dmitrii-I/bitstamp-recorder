@@ -20,13 +20,14 @@ import hashlib
 
 class WebsocketRecorder(WebSocketClient):
         """ This class inherits from WebSocketClient class. We extend the __init__ method a bit. """
-        def __init__(self, url, msg_to_send, max_lines, script_filename, machine_id, ws_name):
+        def __init__(self, url, msg_to_send, max_lines, script_filename, machine_id, ws_name, field_separator):
                 self.url = url
                 self.msg_to_send = msg_to_send
 		self.max_lines = max_lines 
                 self.recorder_version = self.md5sum(script_filename)
                 self.machine_id = machine_id
                 self.ws_name = ws_name
+                self.fs = field_separator
                 self.recorder_session_id = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f UTC")
                 self.datafile = open(self.new_filename(), "a")
                 self.datafile_lines_counter = 0
@@ -34,7 +35,7 @@ class WebsocketRecorder(WebSocketClient):
                 
         def new_filename(self):
                 timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%Hh%Mm%Ss")
-                filename = timestamp + self.ws_name + self.machine_id + ".csv"
+                filename = timestamp + "_" + self.ws_name + "_" + self.machine_id + ".csv"
                 return(filename)
 
         def opened(self):
@@ -52,13 +53,14 @@ class WebsocketRecorder(WebSocketClient):
                 self.datafile.close()
 
         def received_message(self, ws_msg):
-                # Called when WebSocket message is received. We write one message
-                # per line, never more.
+                # Called when a WebSockets message is received. We write one message
+                # per line. In addition to the WebSockets message, some other meta
+                # info is written too.
                 
-                # Add some meta information to the WebSocket message
-                message = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f UTC, ")\
-                        + str(ws_msg) + ", " + self.recorder_version + ", "\
-                        + self.machine_id + ", " + self.recorder_session_id + ", "\
+                message = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f UTC")\
+                        + self.fs + str(ws_msg) + self.fs\
+                        + self.recorder_version + self.fs + self.machine_id\
+                        + self.fs + self.recorder_session_id + self.fs\
                         + self.url + "\n"
 
                 self.datafile.write(message)                
@@ -86,10 +88,10 @@ if __name__ == '__main__':
         
         # Load the settings specific to a particular websocket source.
         # The settings ar stored as Python variables.
-        
         execfile(settings_file) 
+
         sys.stdout = open(stdout_file, "a")
         sys.stderr = open(stderr_file, "a")
-        recorder = WebsocketRecorder(url, msg_to_send, max_lines, script_filename, machine_id, ws_name)
+        recorder = WebsocketRecorder(url, msg_to_send, max_lines, script_filename, machine_id, ws_name, field_separator)
         recorder.connect()
         recorder.run_forever()
