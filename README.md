@@ -2,10 +2,10 @@
 
 ## What is it?
 
-A Python script to record incoming WebSocket messages into text files. Each received WebSocket message is logged on one line into a text file. On top of the original WebSocket message, some meta info is written too in the same line (e.g. timestamp, hostname). The script can be used with any WebSocket source. For each source create a config file similar to config examples provided in the directory settings.
+A Python script to record incoming WebSocket messages into text files. Each received WebSocket message is written on a single line. On top of the original WebSocket message, some meta info is written too in the same line (e.g. timestamp, hostname). For each source, where source is a WebSockets url, create a config file similar to config examples provided in the settings directory.
 
 ## Why do I need it?
-You need it to record the data to analyze later. For example you record news articles coming out of a news stream, where each news article is sent to you as one WebSocket message. Some bitcoin exchanges, like Bitstamp, provide streaming prices through WebSockets.
+You need it to record the data to analyze later, for example news articles send through WebSockets or to record information from bitcoin exchanges, like Bitstamp.
 
 ## Dependencies
 [ws4py](https://ws4py.readthedocs.org/en/latest/), version 0.3.3. at least. 
@@ -19,5 +19,9 @@ git clone https://github.com/Dmitrii-I/websocket_recorder.git
 ```
 python websocket-recorder.py settings/some-websocket-source.conf &
 ```
-The ampersand at the end runs the script in the background as a child process of your terminal process. If you quit your terminal, the script will quit too. To run it forever, even if you quit the terminal use https://github.com/Dmitrii-I/bash-scripts/blob/master/keep-running.sh or daemonize it somehow.
+The ampersand at the end runs the script in the background as a child process of your terminal process. If you quit your terminal, the script will quit too. To run it forever, even if you quit the terminal run 
+```
+nohup ./websocket-recorder.py some-websocket.conf &
+```
+or use a script similar to https://github.com/Dmitrii-I/bash-scripts/blob/master/keep-running.sh.
 
