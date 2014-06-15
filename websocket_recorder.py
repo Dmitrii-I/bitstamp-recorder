@@ -17,6 +17,7 @@ from ws4py.client.threadedclient import WebSocketClient # trim the fat, import o
 import datetime
 import sys
 import hashlib
+import os
 
 class WebsocketRecorder(WebSocketClient):
         """ This class inherits from WebSocketClient class. We extend the __init__ method a bit. """
@@ -26,6 +27,7 @@ class WebsocketRecorder(WebSocketClient):
 		self.max_lines = max_lines 
                 self.recorder_version = self.md5sum(script_filename)
                 self.machine_id = machine_id
+                self.pid = str(os.getpid())
                 self.ws_name = ws_name
                 self.fs = field_separator
                 self.recorder_session_id = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f UTC")
@@ -35,7 +37,7 @@ class WebsocketRecorder(WebSocketClient):
                 
         def new_filename(self):
                 timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%Hh%Mm%Ss")
-                filename = timestamp + "_" + self.ws_name + "_" + self.machine_id + ".csv"
+                filename = timestamp + "_" + self.ws_name + "_" + self.machine_id + ".tsv"
                 return(filename)
 
         def opened(self):
@@ -61,7 +63,7 @@ class WebsocketRecorder(WebSocketClient):
                         + self.fs + str(ws_msg) + self.fs\
                         + self.recorder_version + self.fs + self.machine_id\
                         + self.fs + self.recorder_session_id + self.fs\
-                        + self.url + "\n"
+                        + self.url + self.fs + self.pid + "\n"
 
                 self.datafile.write(message)                
                 self.datafile_lines_counter += 1
