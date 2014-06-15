@@ -33,6 +33,12 @@ class WebsocketRecorder(WebSocketClient):
                 self.recorder_session_id = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f UTC")
                 self.datafile = open(self.new_filename(), "a")
                 self.datafile_lines_counter = 0
+                try:
+                        if len(extra_meta_data) > 0:
+                                self.extra_meta_data = extra_meta_data
+                except:
+                        self.extra_meta_data = []
+
                 super(WebsocketRecorder, self).__init__(self.url)
                 
         def new_filename(self):
@@ -63,7 +69,16 @@ class WebsocketRecorder(WebSocketClient):
                         + self.fs + str(ws_msg) + self.fs\
                         + self.recorder_version + self.fs + self.machine_id\
                         + self.fs + self.recorder_session_id + self.fs\
-                        + self.url + self.fs + self.pid + "\n"
+                        + self.url + self.fs + self.pid
+
+                # If the config file contained additional custom data
+                # add it at the end of the message:
+                if len(self.extra_meta_data) > 0:
+                        for element in self.extra_meta_data:
+                                message = message + self.fs + element
+
+                # finally end the message with a newline
+                message = message + "\n" 
 
                 self.datafile.write(message)                
                 self.datafile_lines_counter += 1
