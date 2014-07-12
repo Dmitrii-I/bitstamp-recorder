@@ -4,6 +4,10 @@
 
 A Python script to record incoming WebSocket messages into text files. Each received WebSocket message is written on a single line. On top of the original WebSocket message, some meta info is written too in the same line (e.g. timestamp, hostname). For each source, where source is a WebSockets url, create a config file similar to config examples provided in the settings directory.
 
+## What is a WebSocket?
+WebSocket is a communications protocol providing full-duplex communications channels over a single TCP connection. In a full-duplex connection you are able to send and receive message simultaneously. Whereas in hald-duplex you send and receive message sequentially, not simultaneously. The WebSockets protocol has been standardized in RFC 6455.
+
+
 ## Why do I need it?
 You need it to record the data to analyze later, for example news articles send through WebSockets or to record information from bitcoin exchanges, like Bitstamp.
 
