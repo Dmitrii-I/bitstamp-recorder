@@ -29,3 +29,6 @@ nohup ./websocket-recorder.py some-websocket.conf &
 ```
 or use a script similar to https://github.com/Dmitrii-I/bash-scripts/blob/master/keep-running.sh.
 
+## Details
+I have considered compressing the data file after it has reached max_lines, but that would take about 0.5 second for a 1000 line file.
+I do not want to introduce this latency into the recorder. Compressing therefore needs to be done outside this websocket_recorder.py.
