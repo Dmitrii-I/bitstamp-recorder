@@ -33,11 +33,7 @@ class WebsocketRecorder(WebSocketClient):
                 self.recorder_session_id = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f UTC")
                 self.datafile = open(self.new_filename(), "a")
                 self.datafile_lines_counter = 0
-                try:
-                        if len(extra_meta_data) > 0:
-                                self.extra_meta_data = extra_meta_data
-                except:
-                        self.extra_meta_data = []
+                self.extra_meta_data = extra_meta_data
 
                 super(WebsocketRecorder, self).__init__(self.url)
                 
@@ -48,7 +44,8 @@ class WebsocketRecorder(WebSocketClient):
 
         def opened(self):
                 # Send initial messages to the websocket
-                for message in self.msg_to_send:
+                if len(self.msg_to_send) > 0: 
+                    for message in self.msg_to_send:
                         self.send(message)
                  
         def closed(self, code, reason=None):
@@ -56,7 +53,6 @@ class WebsocketRecorder(WebSocketClient):
                 # deliberately by server or because of a connection error
                 exit_message = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f UTC, ")\
                         + "Recorder stopped. Code: " + str(code) + ". Reason: " + str(reason) + "\n"
-		print(exit_message) # gets printed into the log
                 self.datafile.write(exit_message)
                 self.datafile.close()
 
