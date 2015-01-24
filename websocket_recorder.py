@@ -21,7 +21,7 @@ import os
 
 class WebsocketRecorder(WebSocketClient):
         """ This class inherits from WebSocketClient class. We extend the __init__ method a bit. """
-        def __init__(self, url, msg_to_send, max_lines, script_filename, machine_id, ws_name, field_separator):
+        def __init__(self, url, msg_to_send, max_lines, script_filename, machine_id, ws_name, field_separatori, data_dir):
                 self.url = url
                 self.msg_to_send = msg_to_send
 		self.max_lines = max_lines 
@@ -34,12 +34,13 @@ class WebsocketRecorder(WebSocketClient):
                 self.datafile = open(self.new_filename(), "a")
                 self.datafile_lines_counter = 0
                 self.extra_meta_data = extra_meta_data
+                self.data_dir = data_dir
 
                 super(WebsocketRecorder, self).__init__(self.url)
                 
         def new_filename(self):
                 timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%Hh%Mm%Ss")
-                filename = timestamp + "_" + self.ws_name + "_" + self.machine_id + ".tsv"
+                filename = data_dir + "/" + timestamp + "_" + self.ws_name + "_" + self.machine_id + ".tsv"
                 return(filename)
 
         def opened(self):
@@ -105,6 +106,6 @@ if __name__ == '__main__':
 
         sys.stdout = open(stdout_file, "a")
         sys.stderr = open(stderr_file, "a")
-        recorder = WebsocketRecorder(url, msg_to_send, max_lines, script_filename, machine_id, ws_name, field_separator)
+        recorder = WebsocketRecorder(url, msg_to_send, max_lines, script_filename, machine_id, ws_name, field_separator, data_dir)
         recorder.connect()
         recorder.run_forever()
