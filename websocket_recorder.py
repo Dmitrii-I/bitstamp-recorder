@@ -1,110 +1,107 @@
 #!/usr/bin/env python 
 #
-# This Python module records incoming message for a websocket stream. 
-# Each received websocket message is logged on one line in a csv file. On top of the original message,
-# on the same line in the log, we also record the timestamp and some other metadata. 
+# This Python module records incoming messages from a websocket endpoint.
+# Each message is logged on one line, in JSON format. The logged message
+# consists of the original received message plus some meta data. Examples of
+# meta data are the timestamp of receiving the received message, or the hostname.
 #
 # Tested only on Linux.
 #
 # Dependencies: ws4py, version 0.3.3. at least. 
-#
-# Usage: python websocket-recorder.py settings/some-websocket-source.conf &
-# The ampersand makes sure the script in background as a child of your terminal process.
-# If you quit your terminal, the script stops to. To run it forever even if you quit,
-# daemonize it, or use https://github.com/Dmitrii-I/bash-scripts/blob/master/keep-running.sh
 
 from ws4py.client.threadedclient import WebSocketClient # trim the fat, import only one class
 import datetime
-import sys
-import hashlib
 import os
+import json
+import logging
+
+
+logger = logging.getLogger('websocket_recorder')
+logger.setLevel(logging.DEBUG)
+handler = logging.FileHandler(os.path.expanduser('~') + "/var/log/websocket_recorder/log.txt", encoding="utf-8")
+formatter = logging.Formatter(
+    fmt='%(asctime)s.%(msecs).03d\t%(levelname)s\t(%(threadName)-10s)\t%(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+
 
 class WebsocketRecorder(WebSocketClient):
-        """ This class inherits from WebSocketClient class. We extend the __init__ method a bit. """
-        def __init__(self, url, msg_to_send, max_lines, script_filename, machine_id, ws_name, field_separator):
-                self.url = url
-                self.msg_to_send = msg_to_send
-		self.max_lines = max_lines 
-                self.recorder_version = self.md5sum(script_filename)
-                self.machine_id = machine_id
-                self.pid = str(os.getpid())
-                self.ws_name = ws_name
-                self.fs = field_separator
-                self.recorder_session_id = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f UTC")
-                self.datafile = open(self.new_filename(), "a")
-                self.datafile_lines_counter = 0
-                self.extra_meta_data = extra_meta_data
+    def __init__(self, url, initial_msg_out, datafile_lines, script_filename,
+                 hostname, ws_name, hb_seconds, extra_data):
+        """
+        :param url: url of websocket
+        :param initial_msg_out: list of messages to send to the endpoint upon opening connection
+        :param datafile_lines: write this many lines to a datafile, then switch to new file
+        :param script_filename:
+        :param hostname: the name of the local machine
+        :param ws_name: name of the websocket endpoint
+        :param hb_seconds: heartbeat interval
+        :param extra_data: dictionary with additional data to add to each received websocket message
+        :return: Reference to the WebsocketRecorder object
+        """
 
-                super(WebsocketRecorder, self).__init__(self.url)
-                
-        def new_filename(self):
-                timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%Hh%Mm%Ss")
-                filename = timestamp + "_" + self.ws_name + "_" + self.machine_id + ".tsv"
-                return(filename)
+        logger.info("Initialized new WebsocketRecorder object")
+        # A list of messages to be sent upon opening websocket connection. Typically these messages
+        # are subscriptions to channels/events/data
+        self.url = url
+        self.initial_msg_out = initial_msg_out
+        self.datafile_lines = datafile_lines
+        self.datafile = open(self.generate_filename(ws_name, hostname), "a")
+        self.lines_counter = 0
+        self.ws_name = ws_name
+        self.hostname = hostname
 
-        def opened(self):
-                # Send initial messages to the websocket
-                if len(self.msg_to_send) > 0: 
-                    for message in self.msg_to_send:
-                        self.send(message)
-                 
-        def closed(self, code, reason=None):
-                # This method is called if the websocket connection is closed
-                # deliberately by server or because of a connection error
-                exit_message = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f UTC, ")\
-                        + "Recorder stopped. Code: " + str(code) + ". Reason: " + str(reason) + "\n"
-                self.datafile.write(exit_message)
-                self.datafile.close()
+        # Each time a websocket message arrives, we write full_message to the datafile, on a single line.
+        # Here we define parts of the full message that do not change when a websocket message
+        # arrives
+        self.full_message = dict(url=self.url,
+                                 machine_id=self.hostname,
+                                 pid=str(os.getpid()),
+                                 ws_name=self.ws_name,
+                                 session_start=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f UTC"),
+                                 ts_utc=None,
+                                 websocket_msg=None)
+        if len(extra_data) > 0:
+            self.full_message.update(extra_data)
 
-        def received_message(self, ws_msg):
-                # Called when a WebSockets message is received. We write one message
-                # per line. In addition to the WebSockets message, some other meta
-                # info is written too.
-                
-                message = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f UTC")\
-                        + self.fs + str(ws_msg) + self.fs\
-                        + self.recorder_version + self.fs + self.machine_id\
-                        + self.fs + self.recorder_session_id + self.fs\
-                        + self.url + self.fs + self.pid
+        logger.info("The template for the full message set to: %s" % self.full_message)
 
-                # If the config file contained additional custom data
-                # add it at the end of the message:
-                if len(self.extra_meta_data) > 0:
-                        for element in self.extra_meta_data:
-                                message = message + self.fs + element
+        # Call the init methods of WebSocketClient class
+        super(WebsocketRecorder, self).__init__(url, heartbeat_freq=hb_seconds)
 
-                # finally end the message with a newline
-                message = message + "\n" 
+    def generate_filename(self, ws_name, machine_id):
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%Hh%Mm%Ss")
+        filename = timestamp + "_" + self.ws_name + "_" + self.hostname + ".json"
+        logger.info("Generated filename %s" % filename)
+        return(filename)
 
-                self.datafile.write(message)                
-                self.datafile_lines_counter += 1
+    def opened(self):
+        logger.info("WebSocket %s connection opened" % self.ws_name)
+        if len(self.initial_msg_out) > 0:
+            logger.info("Sending initial messages ...")
+            for message in self.initial_msg_out:
+                logger.debug("Sending message: %s" %str(message))
+                self.send(message)
 
-                # Check if the current data file became too big and we need to open new file.
-                # One is one line line and is about 1KB. If log reaches max_lines 
-                # start writing to new datafile
-                if self.datafile_lines_counter >= self.max_lines:
-                        self.datafile.close() # close the full datafile
-                        self.datafile = open(self.new_filename(), 'a') # and open a new one
-                        self.datafile_lines_counter = 0
+    def closed(self, code, reason=None):
+        logger.info("WebSocket connection closed, code: %s, reason: %s" %(code, reason))
+        self.datafile.close()
 
-        def md5sum(self, filename):
-                hasher = hashlib.md5()
-                with open(filename, 'rb') as afile:
-                        buf = afile.read()
-                        hasher.update(buf)
-                return(hasher.hexdigest())
- 
+    def received_message(self, websocket_msg):
+        logger.debug("Received message: %s" % websocket_msg)
+        self.full_message['ts_utc'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f UTC')
+        self.full_message['websocket_msg'] = str(websocket_msg).replace("\n", "")
 
-if __name__ == '__main__':
-        script_filename = sys.argv[0]
-        settings_file = sys.argv[1]
-        
-        # Load the settings specific to a particular websocket source.
-        # The settings ar stored as Python variables.
-        execfile(settings_file) 
+        self.datafile.write(json.dumps(self.full_message, sort_keys=True) + "\n")
+        self.lines_counter += 1
+        # Check if the current data file became too big and we need to open new file.
+        # One is one line line and is about 1KB. If log reaches datafile_lines
+        # start writing to new datafile
+        if self.lines_counter >= self.datafile_lines:
+            self.datafile.close() # close the full datafile
+            self.datafile = open(self.generate_filename(self.ws_name, self.hostname), 'a')
+            self.lines_counter = 0
 
-        sys.stdout = open(stdout_file, "a")
-        sys.stderr = open(stderr_file, "a")
-        recorder = WebsocketRecorder(url, msg_to_send, max_lines, script_filename, machine_id, ws_name, field_separator)
-        recorder.connect()
-        recorder.run_forever()
+
+
