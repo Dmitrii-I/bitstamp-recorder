@@ -27,6 +27,7 @@ logger.addHandler(handler)
 
 
 class WebsocketRecorder(WebSocketClient):
+<<<<<<< HEAD
     def __init__(self, url, initial_msg_out, datafile_lines, script_filename,
                  hostname, ws_name, hb_seconds, extra_data):
         """
@@ -102,6 +103,3 @@ class WebsocketRecorder(WebSocketClient):
             self.datafile.close() # close the full datafile
             self.datafile = open(self.generate_filename(self.ws_name, self.hostname), 'a')
             self.lines_counter = 0
-
-
-
