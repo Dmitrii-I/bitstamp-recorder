@@ -3,7 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$USER_HOME$/koindata/.idea/koindata.iml" filepath="$USER_HOME$/koindata/.idea/koindata.iml" />
-      <module fileurl="file://$PROJECT_DIR$/.idea/websocket-recorder.iml" filepath="$PROJECT_DIR$/.idea/websocket-recorder.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/websocket_recorder.iml" filepath="$PROJECT_DIR$/.idea/websocket_recorder.iml" />
     </modules>
   </component>
 </project>
