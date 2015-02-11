@@ -1,5 +1,3 @@
-#!/usr/bin/env python 
-#
 # This Python module records incoming messages from a websocket endpoint.
 # Each message is logged on one line, in JSON format. The logged message
 # consists of the original received webscket message plus some meta data. Examples of
@@ -8,6 +6,8 @@
 # Tested only on Linux.
 #
 # Dependencies: ws4py, version 0.3.3. at least. 
+
+
 
 from ws4py.client.threadedclient import WebSocketClient # trim the fat, import only one class
 import datetime
