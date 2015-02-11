@@ -22,12 +22,12 @@ git clone git@github.com:Dmitrii-I/websocket_recorder.git
 # create a Python package directory where we will put this module in
 mkdir -p ~/.local/lib/python2.7/site-packages 
 
-\# check that this directory is picked up by Python
+# check that this directory is picked up by Python
 python -c "import sys; sys.path"
-\# and if not check that you are using correct Python version. Try out these as well:
+# and if not check that you are using correct Python version. Try out these as well:
 /usr/bin/env python -c "import sys; sys.path"
 
-\# create a symlink to the module:
+# create a symlink to the module:
 ln -s ~/websocket_recorder ~/.local/lib/python2.7/site-packages/websocket_recorder
 
 \# Test it:
