@@ -30,6 +30,10 @@ python -c "import sys; sys.path"
 # create a symlink to the module:
 ln -s ~/websocket_recorder ~/.local/lib/python2.7/site-packages/websocket_recorder
 
+# create logging directory
+sudo mkdir -p /var/log/websocket_recorder
+# make sure the directory is writeable by the user who will run websocket_recorder
+
 # Test it:
 python -c "import websocket_recorder"
 ```
