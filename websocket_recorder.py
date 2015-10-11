@@ -56,10 +56,12 @@ class WebsocketRecorder(WebSocketClient):
         self.hostname = hostname
         self.data_dir = data_dir
         self.data_file = open(self.generate_filename(), "a")
+        self.msg_seq_no = 0
 
         # Each received websocket message is expanded to a full message and written on a single line.
         # Here we define parts of the full message that stay constant during recording session
-        self.full_message = dict(url=self.url,
+        self.full_message = dict(msg_seq_no=None,
+                                 url=self.url,
                                  machine_id=self.hostname,
                                  pid=str(os.getpid()),
                                  ws_name=self.ws_name,
@@ -73,6 +75,12 @@ class WebsocketRecorder(WebSocketClient):
 
         # Call the init methods of WebSocketClient class
         super(WebsocketRecorder, self).__init__(url, heartbeat_freq=hb_seconds)
+
+    def get_msg_seq_no(self):
+        # since no check is done if we exceed sys.maxint, there will be an exception
+        # once the msg_seq_no exceeds 2,147,483,647 (32-bit) or 9,223,372,036,854,775,807 (64-bit)
+        self.msg_seq_no += 1
+        return self.msg_seq_no
 
     def generate_filename(self):
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%Hh%Mm%Ss")
@@ -94,6 +102,7 @@ class WebsocketRecorder(WebSocketClient):
 
     def received_message(self, websocket_msg):
         wsrec_logger.debug("Received message: %s" % websocket_msg)
+        self.full_message['msg_seq_no'] = self.get_msg_seq_no()
         self.full_message['ts_utc'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f UTC')
         self.full_message['websocket_msg'] = str(websocket_msg).replace("\n", "")
 
