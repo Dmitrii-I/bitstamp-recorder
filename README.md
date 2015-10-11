@@ -1,15 +1,6 @@
 # websocket\_recorder
 
-## What is it?
-
-A Python module exposing class WebsocketRecorder allowing you to record incoming WebSocket messages into text files. Each received WebSocket message is written on a single line. On top of the original WebSocket message, some meta info is written too in the same line (e.g. timestamp, hostname). 
-
-## What is a WebSocket?
-WebSocket is a communications protocol providing full-duplex communications channels over a single TCP connection. In a full-duplex connection you are able to send and receive message simultaneously. Whereas in hald-duplex you send and receive message sequentially, not simultaneously. The WebSockets protocol has been standardized in RFC 6455.
-
-
-## Why do I need it?
-You need it to record the data to analyze later, for example news articles send through WebSockets or to record data from bitcoin exchanges, like Bitstamp.
+A Python module to record incoming WebSocket messages into text files. Each received WebSocket message plus meta data (hostname, timestamp) is written on a single line as JSON.
 
 ## Dependencies
 [ws4py](https://ws4py.readthedocs.org/en/latest/), version 0.3.3. at least. 
@@ -21,6 +12,8 @@ git clone git@github.com:Dmitrii-I/websocket_recorder.git
 
 # create a Python package directory where we will put this module in
 mkdir -p ~/.local/lib/python2.7/site-packages 
+or put it in 
+/usr/local/lib/python2.7/dist-packages
 
 # check that this directory is picked up by Python
 python -c "import sys; sys.path"
