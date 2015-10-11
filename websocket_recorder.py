@@ -83,8 +83,8 @@ class WebsocketRecorder(WebSocketClient):
         return self.msg_seq_no
 
     def generate_filename(self):
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d_%Hh%Mm%Ss")
-        filename = self.data_dir + "/" + timestamp + "_" + self.ws_name + "_" + self.hostname + ".json"
+        date_part = datetime.datetime.now().strftime("%Y-%m-%d")
+        filename = self.data_dir + "/" + date_part + "_" + self.ws_name + "_" + self.hostname + ".json"
         wsrec_logger.info("Generated filename %s" % filename)
         return filename
 
@@ -106,10 +106,13 @@ class WebsocketRecorder(WebSocketClient):
         self.full_message['ts_utc'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f UTC')
         self.full_message['websocket_msg'] = str(websocket_msg).replace("\n", "")
 
-        self.data_file.write(json.dumps(self.full_message, sort_keys=True) + "\n")
-        self.lines_counter += 1
-        if self.lines_counter >= self.data_file_lines:
-            # close the full data_file
+        # Here we rely that both file's name and the timestamp contain date yyyy-mm-dd
+        # in the first ten chars. If not, things will break.
+        if self.full_message['ts_utc'][0:10] == self.data_file.name[0:10]:
+            self.data_file.write(json.dumps(self.full_message, sort_keys=True) + "\n")
+        else:
+            # close data_file of previous day
             self.data_file.close()
+            # Create new datafile with current date in the file's name
             self.data_file = open(self.generate_filename(), 'a')
-            self.lines_counter = 0
+            self.data_file.write(json.dumps(self.full_message, sort_keys=True) + "\n")
