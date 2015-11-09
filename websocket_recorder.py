@@ -1,13 +1,11 @@
-# This Python module records incoming messages from a websocket endpoint.
-# Each message is logged on one line, in JSON format. The logged message
-# consists of the original received webscket message plus some meta data. Examples of
-# meta data are the timestamp of receiving the received message, or the hostname.
+# Record incoming messages from a websocket endpoint. Each message is logged on a single line,
+# in JSON format. The logged message consists of the original received websocket message plus
+# some meta data. Examples of meta data are the timestamp when the message was received, or the hostname
+# where the recorder is running.
 #
 # Tested only on Linux.
 #
 # Dependencies: ws4py, version 0.3.3. at least. 
-
-
 
 from ws4py.client.threadedclient import WebSocketClient # trim the fat, import only one class
 import datetime
@@ -84,7 +82,7 @@ class WebsocketRecorder(WebSocketClient):
 
     def generate_filename(self):
         date_part = datetime.datetime.now().strftime("%Y-%m-%d")
-        filename = self.data_dir + "/" + date_part + "_" + self.ws_name + "_" + self.hostname + ".json"
+        filename = self.data_dir + "/" + date_part + "_" + self.ws_name + "_" + self.hostname + ".json.open"
         wsrec_logger.info("Generated filename %s" % filename)
         return filename
 
@@ -108,11 +106,14 @@ class WebsocketRecorder(WebSocketClient):
 
         # Here we rely that both file's name and the timestamp contain date yyyy-mm-dd
         # in the first ten chars. If not, things will break.
-        if self.full_message['ts_utc'][0:10] == self.data_file.name[0:10]:
+        if self.full_message['ts_utc'][0:10] == os.path.basename(self.data_file.name)[0:10]:
             self.data_file.write(json.dumps(self.full_message, sort_keys=True) + "\n")
         else:
-            # close data_file of previous day
+            # close data_file of previous day and remove the .open postfix
+            current_path = self.data_file.name
             self.data_file.close()
+            os.rename(current_path, current_path.replace(".open"))
+
             # Create new datafile with current date in the file's name
             self.data_file = open(self.generate_filename(), 'a')
             self.data_file.write(json.dumps(self.full_message, sort_keys=True) + "\n")
