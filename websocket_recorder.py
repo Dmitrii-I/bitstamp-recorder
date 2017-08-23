@@ -91,10 +91,12 @@ class WebsocketRecorder(WebSocketClient):
         if self.full_message['ts_utc'][0:10] == os.path.basename(self.data_file.name)[0:10]:
             self.data_file.write(json.dumps(self.full_message, sort_keys=True) + "\n")
         else:
+            wsrec_logger.info("New day")
             # close data_file of previous day and remove the .open postfix
             current_path = self.data_file.name
             self.data_file.close()
-            os.rename(current_path, current_path.replace(".open"))
+            os.rename(current_path, current_path.replace(".open", ""))
+            wsrec_logger.info("Stripped .open postfix from datafile name")
 
             # Create new datafile with current date in the file's name
             self.data_file = open(self.generate_filename(), 'a')
