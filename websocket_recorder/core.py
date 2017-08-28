@@ -1,33 +1,37 @@
-# Record incoming messages from a websocket endpoint. Each message is logged on a single line,
-# in JSON format. The logged message consists of the original received websocket message plus
-# some meta data. Examples of meta data are the timestamp when the message was received, or the hostname
-# where the recorder is running.
+""" Record incoming messages from a websocket endpoint.
+
+Each websockets message is augmented and then written to a compressed JSON lines file. The augmented message
+consists of the original websocket message and meta data. Examples of meta data are the timestamp when the message
+was received, or the hostname of the computer on which the recorder is running.
+"""
 
 
-from ws4py.client.threadedclient import WebSocketClient
-import datetime
-import os
-import json
 import gzip
+
 from logging import getLogger
 from multiprocessing import Pipe, Process
+from ws4py.client.threadedclient import WebSocketClient
+from datetime import datetime
+from os.path import basename
+from os import getpid
+from json import dumps
 
 
 log = getLogger(__name__)
 
 
 class _CompressedDataFile:
+    """ This private class represents a compressed datafile. Messages are flushed to disk once the buffer is full."""
+
     def __init__(self, datafile_path):
         self.datafile_path = datafile_path
-        self.name = os.path.basename(self.datafile_path)
+        self.name = basename(self.datafile_path)
         self.pipe = Pipe(False)
         self.recv_conn, self.send_conn = self.pipe
 
         self.gzip_writer = Process(target=self._write_pipe_to_disk, args=(self.pipe, self.datafile_path))
         self.gzip_writer.start()
         self.recv_conn.close()
-
-
 
     @staticmethod
     def _write_pipe_to_disk(pipe, datafile_path):
@@ -53,7 +57,7 @@ class _CompressedDataFile:
                     print('Done writing final chunk')
                     break
 
-                messages_buffer += (message + '\n').encode('utf-8')
+                messages_buffer += message.encode('utf-8')
                 buffer_counter += 1
 
                 if buffer_counter >= max_buffered_messages:
@@ -103,9 +107,9 @@ class WebsocketRecorder(WebSocketClient):
             msg_seq_no=None,
             url=self.url,
             machine_id=self.hostname,
-            pid=str(os.getpid()),
+            pid=str(getpid()),
             ws_name=self.ws_name,
-            session_start=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f UTC"),
+            session_start=datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f UTC"),
             ts_utc=None,
             websocket_msg=None)
 
@@ -123,7 +127,7 @@ class WebsocketRecorder(WebSocketClient):
         return self.msg_seq_no
 
     def generate_filename(self):
-        date_part = datetime.datetime.now().strftime("%Y-%m-%d")
+        date_part = datetime.now().strftime("%Y-%m-%d")
         filename = self.data_dir + "/" + date_part + "_" + self.ws_name + "_" + self.hostname + ".json.gz"
         log.info("Generated filename %s" % filename)
         return filename
@@ -143,12 +147,12 @@ class WebsocketRecorder(WebSocketClient):
     def received_message(self, message):
         log.debug("Received message: %s" % message)
         self.augmented_message['msg_seq_no'] = self.get_msg_seq_no()
-        self.augmented_message['ts_utc'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f UTC')
+        self.augmented_message['ts_utc'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f UTC')
         self.augmented_message['message'] = str(message).replace("\n", "")
 
-        if self.augmented_message['ts_utc'][0:10] != os.path.basename(self.data_file.name)[0:10]:
+        if self.augmented_message['ts_utc'][0:10] != basename(self.data_file.name)[0:10]:
             log.info("Rotate datafiles: close current datafile; open new datafile")
             self.data_file.close()
             self.data_file = _CompressedDataFile(self.generate_filename())
 
-        self.data_file.write(json.dumps(self.augmented_message, sort_keys=True) + "\n")
+        self.data_file.write(dumps(self.augmented_message, sort_keys=True) + "\n")
