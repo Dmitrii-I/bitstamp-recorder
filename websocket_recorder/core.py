@@ -9,7 +9,7 @@ was received, or the hostname of the computer on which the recorder is running.
 import gzip
 
 from logging import getLogger
-from multiprocessing import Pipe, Process, Queue
+from multiprocessing import Process, Queue
 from ws4py.client.threadedclient import WebSocketClient
 from datetime import datetime
 from os.path import basename
@@ -40,67 +40,6 @@ class _CompressedDataFile:
     def __init__(self, datafile_path):
         self.path = datafile_path
         self.name = basename(self.path)
-        self.pipe = Pipe(False)
-        self.recv_conn, self.send_conn = self.pipe
-
-        self.gzip_writer = Process(target=self._write_pipe_to_disk, args=(self.pipe, self.path))
-        self.gzip_writer.start()
-        log.info('Logging into %s using process with pid %s' % (self.path, self.gzip_writer.pid))
-
-        self.recv_conn.close()
-
-    @staticmethod
-    def _write_pipe_to_disk(pipe, datafile_path):
-        recv_conn, send_conn = pipe
-        send_conn.close()
-
-        messages_buffer = b''
-        max_buffered_messages = 10000
-        buffer_counter = 0
-
-        def _write_to_gzip_file(blob):
-            with gzip.open(datafile_path, 'ab') as gzip_file:
-                gzip_file.write(blob)
-                gzip_file.flush()
-
-        while True:
-            try:
-                message = str(recv_conn.recv())
-
-                if message == '\x04':
-                    print('End of transmission')
-                    _write_to_gzip_file(messages_buffer)
-                    print('Done writing final chunk')
-                    break
-
-                messages_buffer += message.encode('utf-8')
-                buffer_counter += 1
-
-                if buffer_counter >= max_buffered_messages:
-                    print('buffer full, writing to gzip')
-                    _write_to_gzip_file(messages_buffer)
-                    messages_buffer = b''
-                    buffer_counter = 0
-
-            except EOFError:
-                print('Received EOF')
-                # sleep(1)
-                _write_to_gzip_file(messages_buffer)
-                break
-
-    def append(self, message):
-        self.send_conn.send(message)
-
-    def close(self):
-        self.append('\x04')
-
-
-class _CompressedDataFile2:
-    """ This private class represents a compressed datafile. Messages are flushed to disk once the buffer is full."""
-
-    def __init__(self, datafile_path):
-        self.path = datafile_path
-        self.name = basename(self.path)
         self.queue = Queue()
 
         self.gzip_writer = Process(target=self._write_queue_to_disk, args=(self.queue, self.path))
@@ -111,6 +50,7 @@ class _CompressedDataFile2:
     def _write_queue_to_disk(queue, datafile_path):
 
         messages_buffer = b''
+        min_messages_per_run = 1000
 
         def _write_to_gzip_file(blob):
             with gzip.open(datafile_path, 'ab') as gzip_file:
@@ -118,21 +58,14 @@ class _CompressedDataFile2:
                 gzip_file.flush()
 
         while True:
-            try:
-                message = queue.get(True, 0.005)
+            for i in range(max([min_messages_per_run, queue.qsize()])):
+                try:
+                    messages_buffer += str(queue.get(True, 0.01)).encode('utf-8')
+                except Empty:
+                    pass
 
-                if message == '\x04':
-                    print('End of transmission')
-                    _write_to_gzip_file(messages_buffer)
-                    print('Done writing final chunk')
-                    break
-
-                messages_buffer += str(message).encode('utf-8')
-            except Empty:
-                if len(messages_buffer) > 0:
-                    _write_to_gzip_file(messages_buffer)
-                    messages_buffer = b''
-
+            _write_to_gzip_file(messages_buffer)
+            messages_buffer = b''
             sleep(30)
 
     def append(self, message):
@@ -166,7 +99,7 @@ class WebsocketRecorder(WebSocketClient):
         self.compress = compress
 
         if self.compress:
-            self.data_file = _CompressedDataFile2(self.generate_filename())
+            self.data_file = _CompressedDataFile(self.generate_filename())
         else:
             self.data_file = _UncompressedDataFile(self.generate_filename())
 
@@ -227,7 +160,7 @@ class WebsocketRecorder(WebSocketClient):
             self.data_file.close()
 
             if self.compress:
-                self.data_file = _CompressedDataFile2(self.generate_filename())
+                self.data_file = _CompressedDataFile(self.generate_filename())
             else:
                 self.data_file = _UncompressedDataFile(self.generate_filename())
 
