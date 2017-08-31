@@ -9,28 +9,44 @@ was received, or the hostname of the computer on which the recorder is running.
 import gzip
 
 from logging import getLogger
-from multiprocessing import Pipe, Process
+from multiprocessing import Pipe, Process, Queue
 from ws4py.client.threadedclient import WebSocketClient
 from datetime import datetime
 from os.path import basename
 from os import getpid
 from json import dumps
+from queue import Empty
+from time import sleep
 
 
 log = getLogger(__name__)
+
+
+class _UncompressedDataFile:
+    def __init__(self, datafile_path):
+        self.path = datafile_path
+        self._datafile = open(self.path, 'a')
+
+    def append(self, message):
+        self._datafile.write(message)
+
+    def close(self):
+        self._datafile.close()
 
 
 class _CompressedDataFile:
     """ This private class represents a compressed datafile. Messages are flushed to disk once the buffer is full."""
 
     def __init__(self, datafile_path):
-        self.datafile_path = datafile_path
-        self.name = basename(self.datafile_path)
+        self.path = datafile_path
+        self.name = basename(self.path)
         self.pipe = Pipe(False)
         self.recv_conn, self.send_conn = self.pipe
 
-        self.gzip_writer = Process(target=self._write_pipe_to_disk, args=(self.pipe, self.datafile_path))
+        self.gzip_writer = Process(target=self._write_pipe_to_disk, args=(self.pipe, self.path))
         self.gzip_writer.start()
+        log.info('Logging into %s using process with pid %s' % (self.path, self.gzip_writer.pid))
+
         self.recv_conn.close()
 
     @staticmethod
@@ -72,15 +88,62 @@ class _CompressedDataFile:
                 _write_to_gzip_file(messages_buffer)
                 break
 
-    def write(self, msg):
-        self.send_conn.send(msg)
+    def append(self, message):
+        self.send_conn.send(message)
 
     def close(self):
-        self.write('\x04')
+        self.append('\x04')
+
+
+class _CompressedDataFile2:
+    """ This private class represents a compressed datafile. Messages are flushed to disk once the buffer is full."""
+
+    def __init__(self, datafile_path):
+        self.path = datafile_path
+        self.name = basename(self.path)
+        self.queue = Queue()
+
+        self.gzip_writer = Process(target=self._write_queue_to_disk, args=(self.queue, self.path))
+        self.gzip_writer.start()
+        log.info('Logging into %s using process with pid %s' % (self.path, self.gzip_writer.pid))
+
+    @staticmethod
+    def _write_queue_to_disk(queue, datafile_path):
+
+        messages_buffer = b''
+
+        def _write_to_gzip_file(blob):
+            with gzip.open(datafile_path, 'ab') as gzip_file:
+                gzip_file.write(blob)
+                gzip_file.flush()
+
+        while True:
+            try:
+                message = queue.get(True, 0.005)
+
+                if message == '\x04':
+                    print('End of transmission')
+                    _write_to_gzip_file(messages_buffer)
+                    print('Done writing final chunk')
+                    break
+
+                messages_buffer += str(message).encode('utf-8')
+            except Empty:
+                if len(messages_buffer) > 0:
+                    _write_to_gzip_file(messages_buffer)
+                    messages_buffer = b''
+
+            sleep(30)
+
+    def append(self, message):
+        self.queue.put_nowait(message)
+
+    def close(self):
+        self.append('\x04')
 
 
 class WebsocketRecorder(WebSocketClient):
-    def __init__(self, data_dir, url, initial_msg_out, hostname, ws_name, hb_seconds, extra_data):
+    def __init__(self, data_dir, url, initial_msg_out, hostname, ws_name, hb_seconds, extra_data, compress=False):
         """
         :param data_dir: the directory where to write the datafiles to. No trailing slash
         :param url: url of websocket
@@ -92,7 +155,7 @@ class WebsocketRecorder(WebSocketClient):
         :return: Reference to the WebsocketRecorder object
         """
 
-        log.info("Initialize WebsocketRecorder")
+        log.info("Initialize WebsocketRecorder, process pid=%s" % getpid())
 
         self.url = url
         self.initial_msg_out = initial_msg_out
@@ -100,7 +163,13 @@ class WebsocketRecorder(WebSocketClient):
         self.ws_name = ws_name
         self.hostname = hostname
         self.data_dir = data_dir
-        self.data_file = _CompressedDataFile(self.generate_filename())
+        self.compress = compress
+
+        if self.compress:
+            self.data_file = _CompressedDataFile2(self.generate_filename())
+        else:
+            self.data_file = _UncompressedDataFile(self.generate_filename())
+
         self.msg_seq_no = 0
 
         self.augmented_message = dict(
@@ -127,8 +196,11 @@ class WebsocketRecorder(WebSocketClient):
         return self.msg_seq_no
 
     def generate_filename(self):
+        extension = '.json.gz' if self.compress else '.json'
         date_part = datetime.now().strftime("%Y-%m-%d")
-        filename = self.data_dir + "/" + date_part + "_" + self.ws_name + "_" + self.hostname + ".json.gz"
+
+        filename = self.data_dir + "/" + date_part + "_" + self.ws_name + "_" + self.hostname + extension
+
         log.info("Generated filename %s" % filename)
         return filename
 
@@ -150,9 +222,13 @@ class WebsocketRecorder(WebSocketClient):
         self.augmented_message['ts_utc'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f UTC')
         self.augmented_message['message'] = str(message).replace("\n", "")
 
-        if self.augmented_message['ts_utc'][0:10] != basename(self.data_file.name)[0:10]:
+        if self.augmented_message['ts_utc'][0:10] != basename(self.data_file.path)[0:10]:
             log.info("Rotate datafiles: close current datafile; open new datafile")
             self.data_file.close()
-            self.data_file = _CompressedDataFile(self.generate_filename())
 
-        self.data_file.write(dumps(self.augmented_message, sort_keys=True) + "\n")
+            if self.compress:
+                self.data_file = _CompressedDataFile2(self.generate_filename())
+            else:
+                self.data_file = _UncompressedDataFile(self.generate_filename())
+
+        self.data_file.append(dumps(self.augmented_message, sort_keys=True) + "\n")
