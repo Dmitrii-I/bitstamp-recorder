@@ -1,8 +1,8 @@
 """ Record incoming messages from a websocket endpoint.
 
-Each websockets message is augmented and then written to a compressed JSON lines file. The augmented message
-consists of the original websocket message and meta data. Examples of meta data are the timestamp when the message
-was received, or the hostname of the computer on which the recorder is running.
+Each websockets message is augmented and then written to a, optionally compressed JSON-lines datafile.
+The augmented message consists of the original websocket message and meta data. Examples of meta data are the timestamp
+when the message was received, or the hostname of the computer on which the recorder is running.
 """
 
 
@@ -16,7 +16,7 @@ from os.path import basename
 from os import getpid
 from json import dumps
 from queue import Empty
-from time import sleep
+from time import sleep, time
 
 
 log = getLogger(__name__)
@@ -35,43 +35,60 @@ class _UncompressedDataFile:
 
 
 class _CompressedDataFile:
-    """ This private class represents a compressed datafile. Messages are flushed to disk once the buffer is full."""
+    """ This private class represents a compressed datafile. """
 
     def __init__(self, datafile_path):
+
+        log.info('Initialize compressed datafile at %s' % datafile_path)
         self.path = datafile_path
         self.name = basename(self.path)
         self.queue = Queue()
 
+        log.info('Start datafile writer in child process')
         self.gzip_writer = Process(target=self._write_queue_to_disk, args=(self.queue, self.path))
         self.gzip_writer.start()
-        log.info('Logging into %s using process with pid %s' % (self.path, self.gzip_writer.pid))
+        log.info('Started datafile writer: pid: %s' % self.gzip_writer.pid)
 
     @staticmethod
     def _write_queue_to_disk(queue, datafile_path):
 
         messages_buffer = b''
         min_messages_per_run = 1000
+        keep_running = True
 
         def _write_to_gzip_file(blob):
+            t0 = time()
+            log.debug('Write blob of size %s to the datafile' % len(blob))
             with gzip.open(datafile_path, 'ab') as gzip_file:
                 gzip_file.write(blob)
                 gzip_file.flush()
+            log.debug('Writing took %s seconds' % (time() - t0))
 
-        while True:
+        while keep_running:
+            log.debug('Populate message buffer from queue')
+            t0 = time()
             for i in range(max([min_messages_per_run, queue.qsize()])):
                 try:
-                    messages_buffer += str(queue.get(True, 0.01)).encode('utf-8')
+                    message = queue.get(True, 0.01)
+                    if message == '\x04':
+                        log.info('Received "poison pill" message as a signal to quit writing.')
+                        keep_running = False
+                        break
+                    messages_buffer += str(message).encode('utf-8')
                 except Empty:
                     pass
+            log.debug('Fetching from queue took %s secons' % (time() - t0))
 
             _write_to_gzip_file(messages_buffer)
             messages_buffer = b''
+            log.debug('Sleep')
             sleep(30)
 
     def append(self, message):
         self.queue.put_nowait(message)
 
     def close(self):
+        log.info('Close datafile: send "poison pill" to queue')
         self.append('\x04')
 
 
@@ -146,11 +163,10 @@ class WebsocketRecorder(WebSocketClient):
                 self.send(message)
 
     def closed(self, code, reason="not given"):
-        log.info("WebSocket connection closed, code: %s, reason: %s" %(code, reason))
+        log.info("WebSocket connection closed, code: %s, reason: %s" % (code, reason))
         self.data_file.close()
 
     def received_message(self, message):
-        log.debug("Received message: %s" % message)
         self.augmented_message['msg_seq_no'] = self.get_msg_seq_no()
         self.augmented_message['ts_utc'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f UTC')
         self.augmented_message['message'] = str(message).replace("\n", "")
@@ -161,7 +177,9 @@ class WebsocketRecorder(WebSocketClient):
 
             if self.compress:
                 self.data_file = _CompressedDataFile(self.generate_filename())
+                log.info('Opened new compressed datafile at %s' % self.data_file.path)
             else:
                 self.data_file = _UncompressedDataFile(self.generate_filename())
+                log.info('Opened new uncompressed datafile at %s' % self.data_file.path)
 
         self.data_file.append(dumps(self.augmented_message, sort_keys=True) + "\n")
