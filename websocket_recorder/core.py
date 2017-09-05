@@ -5,95 +5,19 @@ The augmented message consists of the original websocket message and meta data. 
 when the message was received, or the hostname of the computer on which the recorder is running.
 """
 
-
-import gzip
-
 from logging import getLogger
-from multiprocessing import Process, Queue
 from ws4py.client.threadedclient import WebSocketClient
 from datetime import datetime
 from os.path import basename
 from os import getpid
 from json import dumps
-from queue import Empty
-from time import sleep, time
 
 
 log = getLogger(__name__)
 
 
-class _UncompressedDataFile:
-    def __init__(self, datafile_path):
-        self.path = datafile_path
-        self._datafile = open(self.path, 'a')
-
-    def append(self, message):
-        self._datafile.write(message)
-
-    def close(self):
-        self._datafile.close()
-
-
-class _CompressedDataFile:
-    """ This private class represents a compressed datafile. """
-
-    def __init__(self, datafile_path):
-
-        log.info('Initialize compressed datafile at %s' % datafile_path)
-        self.path = datafile_path
-        self.name = basename(self.path)
-        self.queue = Queue()
-
-        log.info('Start datafile writer in child process')
-        self.gzip_writer = Process(target=self._write_queue_to_disk, args=(self.queue, self.path))
-        self.gzip_writer.start()
-        log.info('Started datafile writer: pid: %s' % self.gzip_writer.pid)
-
-    @staticmethod
-    def _write_queue_to_disk(queue, datafile_path):
-
-        messages_buffer = b''
-        min_messages_per_run = 1000
-        keep_running = True
-
-        def _write_to_gzip_file(blob):
-            t0 = time()
-            log.debug('Write blob of size %s to the datafile' % len(blob))
-            with gzip.open(datafile_path, 'ab') as gzip_file:
-                gzip_file.write(blob)
-                gzip_file.flush()
-            log.debug('Writing took %s seconds' % (time() - t0))
-
-        while keep_running:
-            log.debug('Populate message buffer from queue')
-            t0 = time()
-            for i in range(max([min_messages_per_run, queue.qsize()])):
-                try:
-                    message = queue.get(True, 0.01)
-                    if message == '\x04':
-                        log.info('Received "poison pill" message as a signal to quit writing.')
-                        keep_running = False
-                        break
-                    messages_buffer += str(message).encode('utf-8')
-                except Empty:
-                    pass
-            log.debug('Fetching from queue took %s secons' % (time() - t0))
-
-            _write_to_gzip_file(messages_buffer)
-            messages_buffer = b''
-            log.debug('Sleep')
-            sleep(30)
-
-    def append(self, message):
-        self.queue.put_nowait(message)
-
-    def close(self):
-        log.info('Close datafile: send "poison pill" to queue')
-        self.append('\x04')
-
-
 class WebsocketRecorder(WebSocketClient):
-    def __init__(self, data_dir, url, initial_msg_out, hostname, ws_name, hb_seconds, extra_data, compress=False):
+    def __init__(self, data_dir, url, initial_msg_out, hostname, ws_name, hb_seconds, extra_data):
         """
         :param data_dir: the directory where to write the datafiles to. No trailing slash
         :param url: url of websocket
@@ -113,24 +37,16 @@ class WebsocketRecorder(WebSocketClient):
         self.ws_name = ws_name
         self.hostname = hostname
         self.data_dir = data_dir
-        self.compress = compress
-
-        if self.compress:
-            self.data_file = _CompressedDataFile(self.generate_filename())
-        else:
-            self.data_file = _UncompressedDataFile(self.generate_filename())
-
+        self.data_file = open(self.generate_filename(), 'a')
         self.msg_seq_no = 0
 
         self.augmented_message = dict(
-            msg_seq_no=None,
             url=self.url,
             machine_id=self.hostname,
             pid=str(getpid()),
             ws_name=self.ws_name,
-            session_start=datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f UTC"),
-            ts_utc=None,
-            websocket_msg=None)
+            session_start=datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f UTC")
+        )
 
         if len(extra_data) > 0:
             self.augmented_message.update(extra_data)
@@ -140,14 +56,16 @@ class WebsocketRecorder(WebSocketClient):
         super().__init__(url, heartbeat_freq=hb_seconds)
 
     def get_msg_seq_no(self):
-        # since no check is done if we exceed sys.maxint, there will be an exception
-        # once the msg_seq_no exceeds 2,147,483,647 (32-bit) or 9,223,372,036,854,775,807 (64-bit)
+        """ since no check is done if we exceed sys.maxint, there will be an exception
+        once the msg_seq_no exceeds 2,147,483,647 (32-bit) or 9,223,372,036,854,775,807 (64-bit)
+        """
+
         self.msg_seq_no += 1
         return self.msg_seq_no
 
     def generate_filename(self):
-        extension = '.json.gz' if self.compress else '.json'
-        date_part = datetime.now().strftime("%Y-%m-%d")
+        extension = '.jsonl'
+        date_part = datetime.now().strftime("%Y-%m-%dT%H")
 
         filename = self.data_dir + "/" + date_part + "_" + self.ws_name + "_" + self.hostname + extension
 
@@ -171,15 +89,11 @@ class WebsocketRecorder(WebSocketClient):
         self.augmented_message['ts_utc'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f UTC')
         self.augmented_message['message'] = str(message).replace("\n", "")
 
-        if self.augmented_message['ts_utc'][0:10] != basename(self.data_file.path)[0:10]:
-            log.info("Rotate datafiles: close current datafile; open new datafile")
+        if self.augmented_message['ts_utc'][0:13] != basename(self.data_file.name)[0:13]:
+            log.info("new hour, start new datafile")
+            self.data_file.flush()
             self.data_file.close()
+            self.data_file = open(self.generate_filename(), 'a')
 
-            if self.compress:
-                self.data_file = _CompressedDataFile(self.generate_filename())
-                log.info('Opened new compressed datafile at %s' % self.data_file.path)
-            else:
-                self.data_file = _UncompressedDataFile(self.generate_filename())
-                log.info('Opened new uncompressed datafile at %s' % self.data_file.path)
+        self.data_file.write(dumps(self.augmented_message, sort_keys=True) + '\n')
 
-        self.data_file.append(dumps(self.augmented_message, sort_keys=True) + "\n")
