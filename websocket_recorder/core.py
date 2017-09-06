@@ -38,7 +38,7 @@ class WebsocketRecorder(WebSocketClient):
         self.ws_name = ws_name
         self.hostname = hostname
         self.data_dir = data_dir
-        self.data_file = open(self.generate_filename(), 'a')
+        self.data_file = open(self.generate_filename() + '.open', 'a')
         self.msg_seq_no = 0
 
         self.augmented_message = dict(
