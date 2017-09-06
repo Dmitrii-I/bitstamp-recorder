@@ -11,6 +11,7 @@ from datetime import datetime
 from os.path import basename
 from os import getpid
 from json import dumps
+from os import rename
 
 
 log = getLogger(__name__)
@@ -93,7 +94,7 @@ class WebsocketRecorder(WebSocketClient):
             log.info("new hour, start new datafile")
             self.data_file.flush()
             self.data_file.close()
-            self.data_file = open(self.generate_filename(), 'a')
+            rename(self.data_file.name, self.data_file.name.replace('.open', ''))
+            self.data_file = open(self.generate_filename() + '.open', 'a')
 
         self.data_file.write(dumps(self.augmented_message, sort_keys=True) + '\n')
-
