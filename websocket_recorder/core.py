@@ -87,7 +87,7 @@ class WebsocketRecorder(WebSocketClient):
 
     def received_message(self, message):
         self.augmented_message['msg_seq_no'] = self.get_msg_seq_no()
-        self.augmented_message['ts_utc'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f UTC')
+        self.augmented_message['ts_utc'] = datetime.now().strftime('%Y-%m-%dT%H:%M:%S.%f UTC')
         self.augmented_message['message'] = str(message).replace("\n", "")
 
         if self.augmented_message['ts_utc'][0:13] != basename(self.data_file.name)[0:13]:
